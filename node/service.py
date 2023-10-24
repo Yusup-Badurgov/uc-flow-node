@@ -5,42 +5,118 @@ from uc_flow_nodes.views import info, execute
 from uc_flow_schemas import flow
 from uc_flow_schemas.flow import Property, RunState
 from uc_http_requester.requester import Request
+from typing import List
+from pydantic import SecretStr
+from uc_flow_schemas import flow
+from uc_flow_schemas.flow import (
+    Defaults,
+    Property,
+    NodeType as BaseNodeType,
+    DisplayOptions,
+    OptionValue,
+)
+
+from node.enums import first_dropdown, second_dropdown
 
 
-def create_property(display_name: str, name: str, prop_type: Property.Type, description: str) -> Property:
-    if prop_type == Property.Type.BOOLEAN:
-        placeholder = ''
-    elif prop_type == Property.Type.STRING:
-        placeholder = f'Введите текст {description}'
-    elif prop_type == Property.Type.NUMBER:
-        placeholder = f'Введите число {description}'
-    else:
-        placeholder = f'Введите {description}'
-
-    return Property(
-        displayName=display_name,
-        name=name,
-        type=prop_type,
-        placeholder=placeholder,
-        description=description,
-        required=True
-    )
-
-
-class NodeType(flow.NodeType):
-    id: str = '3e4dbc22-c5e8-4e57-8d56-8e862b759480'
-    type: flow.NodeType.Type = flow.NodeType.Type.action
-    name: str = 'SumTwoNumbers'
-    displayName: str = 'Calculate Sum'
-    icon: str = '<svg><text x="8" y="50" font-size="50">∑</text></svg>'
-    description: str = 'Calculates the sum of two input numbers and returns the result as either a string or a number based on the toggle.'
+class NodeType(BaseNodeType):
+    id: str = 'b4dd759a-c74e-4be3-ae79-fc44f0205a4c'
+    secret: SecretStr = '999'
+    type: BaseNodeType.Type = BaseNodeType.Type.action
+    displayName: str = 'YusupHollihop'
+    icon: str = '<svg><text x="8" y="50" font-size="50">YusupHOP</text></svg>'
+    group: List[str] = ["custom"]
+    version: int = 1
+    description: str = 'Custom action node'
+    defaults: Defaults = Defaults(name='custom-action', color='#00FF00')
+    inputs: List[str] = ['main']
+    outputs: List[str] = ['main']
     properties: List[Property] = [
-        create_property('Текстовое поле', 'text_field',
-                        Property.Type.STRING, 'Текст'),
-        create_property('Числовое поле', 'number_field',
-                        Property.Type.NUMBER, 'Число'),
-        create_property('Переключатель типа результата', 'toggle', Property.Type.BOOLEAN,
-                        'Если включено, результат будет в формате строки. Если выключено, результат будет числом.')
+        Property(
+            displayName='Переключатель',
+            name='toggle',
+            type=Property.Type.BOOLEAN,
+            required=True
+        ),
+        Property(
+            displayName='Первый список',
+            name='first_dropdown',
+            type=Property.Type.OPTIONS,
+            noDataExpression=True,
+            options=[
+                OptionValue(
+                    name='Значение 1',
+                    value=first_dropdown.VALUE_1,
+                    description='Значение 1',
+                ),
+                OptionValue(
+                    name='Значение 2',
+                    value=first_dropdown.VALUE_2,
+                    description='Значение 2',
+                ),
+            ],
+            displayOptions=DisplayOptions(
+                show={
+                    'toggle': [True],
+                },
+            ),
+        ),
+        Property(
+            displayName='Второй список',
+            name='second_dropdown',
+            type=Property.Type.OPTIONS,
+            noDataExpression=True,
+            options=[
+                OptionValue(
+                    name='Значение 1',
+                    value=second_dropdown.VALUE_1,
+                    description='Значение 1',
+                ),
+                OptionValue(
+                    name='Значение 2',
+                    value=second_dropdown.VALUE_2,
+                    description='Значение 2',
+                ),
+            ],
+            displayOptions=DisplayOptions(
+                show={
+                    'toggle': [True],
+                },
+            ),
+        ),
+        Property(
+            displayName='Поле для ввода почты',
+            name='email_field',
+            type=Property.Type.STRING,
+            placeholder='Введите ваш email',
+            displayOptions=DisplayOptions(
+                show={
+                    'first_dropdown': [
+                        first_dropdown.VALUE_1,
+                    ],
+                    'second_dropdown': [
+                        second_dropdown.VALUE_1,
+                    ]
+                },
+            ),
+        ),
+        Property(
+            displayName='Поле для ввода даты и времени',
+            name='datetime_field',
+            type=Property.Type.DATETIME,
+            placeholder='Выберите дату и время',
+            displayOptions=DisplayOptions(
+                show={
+                    'first_dropdown': [
+                        first_dropdown.VALUE_2,
+                    ],
+                    'second_dropdown': [
+                        second_dropdown.VALUE_2,
+                    ]
+                },
+            ),
+        ),
+
     ]
 
 
@@ -52,27 +128,30 @@ class InfoView(info.Info):
 class ExecuteView(execute.Execute):
     async def post(self, json: NodeRunContext) -> NodeRunContext:
         try:
-            text_value = json.node.data.properties.get('text_field', "0")
-            number_value = json.node.data.properties.get('number_field', 0)
             toggle_value = json.node.data.properties.get('toggle', False)
+            first_dropdown_value = json.node.data.properties.get('first_dropdown')
+            second_dropdown_value = json.node.data.properties.get('second_dropdown')
 
-            # Переводим текстовое значение в число и суммируем с числовым значением. Есть возможность работать с числами с зяпятой.
-            total = float(text_value) + number_value
+            # Проверка для "Значение 1"
+            if toggle_value and first_dropdown_value == first_dropdown.VALUE_1 and second_dropdown_value == second_dropdown.VALUE_1:
+                email_value = json.node.data.properties.get('email_field')
+                await json.save_result({"email": email_value})
+            
+            # Проверка для "Значение 2"
+            elif toggle_value and first_dropdown_value == first_dropdown.VALUE_2 and second_dropdown_value == second_dropdown.VALUE_2:
+                datetime_value = json.node.data.properties.get('datetime_field')
+                await json.save_result({"datetime": datetime_value})
+            
+            else:
+                await json.save_error("Тумблер выключен или выбраны разные значения в списках.")
 
-            # Если результат является целым числом, преобразуем его в целое число.
-            if total.is_integer():
-                total = int(total)
-
-            # переключатель строка\число
-            result_value = str(total) if toggle_value else total
-
-            await json.save_result({"result": result_value})
             json.state = RunState.complete
         except Exception as e:
             self.log.warning(f'Error {e}')
             await json.save_error(str(e))
             json.state = RunState.error
         return json
+
 
 
 class Service(NodeService):
