@@ -21,6 +21,7 @@
    
    - В первом "кубике" "AYusupGoogle Cloud ApiAPP":
      - Выберите "Авторизация".
+     - Заполните поля private_key и client_email данными из кабинета сервисного аккаунта Google Cloud/
      - В поле file_data добавьте:
        ```python
        my_data = await context.get_parent_result("id куба");
